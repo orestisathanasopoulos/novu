@@ -24,11 +24,11 @@ const isPlaywright = isBrowser() && (window as any).isPlaywright;
 export const API_ROOT =
   window._env_.REACT_APP_API_URL || isPlaywright
     ? window._env_.REACT_APP_API_URL || process.env.REACT_APP_API_URL || autodetectApiRoot() || 'http://localhost:1336'
-    : window._env_.REACT_APP_API_URL || process.env.REACT_APP_API_URL || autodetectApiRoot() || 'http://localhost:3000';
+    : window._env_.REACT_APP_API_URL || process.env.REACT_APP_API_URL || autodetectApiRoot() || 'http://localhost:8000';
 
 export const WS_URL = isPlaywright
   ? window._env_.REACT_APP_WS_URL || process.env.REACT_APP_WS_URL || 'http://localhost:1340'
-  : window._env_.REACT_APP_WS_URL || process.env.REACT_APP_WS_URL || 'http://localhost:3002';
+  : window._env_.REACT_APP_WS_URL || process.env.REACT_APP_WS_URL || 'http://localhost:8002';
 
 export const SENTRY_DSN = window._env_.REACT_APP_SENTRY_DSN || process.env.REACT_APP_SENTRY_DSN;
 
@@ -63,7 +63,7 @@ export const CONTEXT_PATH = getContextPath(NovuComponentEnum.WEB);
 
 export const WEBHOOK_URL = isPlaywright
   ? window._env_.REACT_APP_WEBHOOK_URL || process.env.REACT_APP_WEBHOOK_URL || 'http://localhost:1341'
-  : window._env_.REACT_APP_WEBHOOK_URL || process.env.REACT_APP_WEBHOOK_URL || 'http://localhost:3003';
+  : window._env_.REACT_APP_WEBHOOK_URL || process.env.REACT_APP_WEBHOOK_URL || 'http://localhost:8003';
 
 export const MAIL_SERVER_DOMAIN =
   window._env_.REACT_APP_MAIL_SERVER_DOMAIN || process.env.REACT_APP_MAIL_SERVER_DOMAIN || 'dev.inbound-mail.novu.co';

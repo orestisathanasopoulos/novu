@@ -13,7 +13,7 @@ const DEFAULT_HOST = 'localhost';
 const DEFAULT_KEEP_ALIVE = 30000;
 const DEFAULT_KEY_PREFIX = '';
 const DEFAULT_FAMILY = 4;
-const DEFAULT_PORT = 6379;
+const DEFAULT_PORT = 6666;
 
 interface IRedisConfig {
   db?: string;

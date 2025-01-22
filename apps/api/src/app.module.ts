@@ -158,7 +158,7 @@ modules.push(
   NovuModule.register({
     apiPath: '/bridge/novu',
     client: new Client({
-      secretKey: process.env.NOVU_INTERNAL_SECRET_KEY,
+      secretKey: 'test',
       strictAuthentication:
         process.env.NODE_ENV === 'production' ||
         process.env.NODE_ENV === 'dev' ||

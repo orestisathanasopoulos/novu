@@ -101,11 +101,11 @@ async function setupRunner() {
 
       await waitPort({
         host: 'localhost',
-        port: 3000,
+        port: 8000,
       });
       await waitPort({
         host: 'localhost',
-        port: 3004,
+        port: 8004,
       });
       await waitPort({
         host: 'localhost',
@@ -122,8 +122,8 @@ async function setupRunner() {
 
         Web: http://127.0.0.1:4200
         Widget: http://127.0.0.1:4500
-        API: http://127.0.0.1:3000
-        Worker: http://127.0.0.1:3004
+        API: http://127.0.0.1:8000
+        Worker: http://127.0.0.1:8004
       `);
     } else if (answers.runConfiguration === WEB_PROJECT) {
       try {
@@ -135,28 +135,28 @@ async function setupRunner() {
 
         await waitPort({
           host: 'localhost',
-          port: 3000,
+          port: 8000,
         });
         await waitPort({
           host: 'localhost',
-          port: 3002,
+          port: 8002,
         });
         await waitPort({
           host: 'localhost',
-          port: 3004,
+          port: 8004,
         });
 
         shell.exec('npm run start:web', { async: true });
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+        await new Promise((resolve) => setTimeout(resolve, 8000));
 
         // eslint-disable-next-line no-console
         console.log(`
           Everything is running 🎊
         
           Web: http://127.0.0.1:4200
-          API: http://127.0.0.1:3000
-          WS: http://127.0.0.1:3002
-          Worker: http://127.0.0.1:3004
+          API: http://127.0.0.1:8000
+          WS: http://127.0.0.1:8002
+          Worker: http://127.0.0.1:8004
         `);
       } catch (e) {
         console.error(`Failed to spin up the project ❌`, e);
@@ -168,18 +168,18 @@ async function setupRunner() {
 
       await waitPort({
         host: 'localhost',
-        port: 3000,
+        port: 8000,
       });
       await waitPort({
         host: 'localhost',
-        port: 3004,
+        port: 8004,
       });
 
       console.log(`
         Everything is running 🎊
 
-        API: http://127.0.0.1:3000
-        Worker: http://127.0.0.1:3004
+        API: http://127.0.0.1:8000
+        Worker: http://127.0.0.1:8004
       `);
     } else if (answers.runApiConfiguration === API_INTEGRATION_TESTS) {
       shell.exec('nx run-many --target=build --projects=@novu/api-service,@novu/worker');

@@ -8,7 +8,7 @@ export class TestingQueueService {
     this.queue = new Queue(name, {
       connection: {
         db: Number(process.env.REDIS_DB_INDEX || '1'),
-        port: Number(process.env.REDIS_PORT || 6379),
+        port: Number(process.env.REDIS_PORT || 6666),
         host: process.env.REDIS_HOST,
         password: process.env.REDIS_PASSWORD,
         connectTimeout: 50000,

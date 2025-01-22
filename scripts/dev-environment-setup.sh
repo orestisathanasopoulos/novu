@@ -413,13 +413,13 @@ start_database() {
       fi
   else
       echo "brew is not installed, checking default ports for MongoDB and Redis"
-      # Check MongoDB (port 27017) and Redis (port 6379)
+      # Check MongoDB (port 27017) and Redis (port 6666)
       if lsof -Pi :27017 -sTCP:LISTEN -t >/dev/null ; then
         echo "Warning: MongoDB is running on port 27017. Please stop it first."
         already_installed=1
       fi
-      if lsof -Pi :6379 -sTCP:LISTEN -t >/dev/null ; then
-        echo "Warning: Redis is running on port 6379. Please stop it first."
+      if lsof -Pi :6666 -sTCP:LISTEN -t >/dev/null ; then
+        echo "Warning: Redis is running on port 6666. Please stop it first."
         already_installed=1
       fi
   fi

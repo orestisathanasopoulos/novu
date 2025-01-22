@@ -75,7 +75,7 @@
 - **js:** Dynamic localization keys and data-localization attribute ([#6383](https://github.com/novuhq/novu/pull/6383))
 - **framework,js:** expose the data property on the in-app step and notification object ([#6391](https://github.com/novuhq/novu/pull/6391))
 - **js:** Pixel perfect implementation ([#6360](https://github.com/novuhq/novu/pull/6360))
-- **js:** Improve perceived loading state ([#6379](https://github.com/novuhq/novu/pull/6379))
+- **js:** Improve perceived loading state ([#6666](https://github.com/novuhq/novu/pull/6666))
 - **js:** Com 159 disable updating preferences for critical worklows ([#6347](https://github.com/novuhq/novu/pull/6347))
 - **js:** Include headers and tabs in separate components ([#6323](https://github.com/novuhq/novu/pull/6323))
 - **js:** Use render props universally with a single argument ([#6341](https://github.com/novuhq/novu/pull/6341))

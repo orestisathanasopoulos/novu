@@ -14,7 +14,7 @@ const originalRedisCacheServiceHost = (process.env.REDIS_CACHE_SERVICE_HOST =
   process.env.REDIS_CACHE_SERVICE_HOST ?? 'localhost');
 // eslint-disable-next-line no-multi-assign
 const originalRedisCacheServicePort = (process.env.REDIS_CACHE_SERVICE_PORT =
-  process.env.REDIS_CACHE_SERVICE_PORT ?? '6379');
+  process.env.REDIS_CACHE_SERVICE_PORT ?? '6666');
 const originalRedisClusterServiceHost = process.env.REDIS_CLUSTER_SERVICE_HOST;
 const originalRedisClusterServicePorts =
   process.env.REDIS_CLUSTER_SERVICE_PORTS;
