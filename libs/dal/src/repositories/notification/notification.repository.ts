@@ -46,12 +46,16 @@ export class NotificationRepository extends BaseRepository<
       requestQuery.transactionId = query.transactionId;
     }
 
-    if (query.after) {
-      requestQuery.createdAt = { $gte: query.after };
-    }
+    if (query.after || query.before) {
+      requestQuery.createdAt = {};
 
-    if (query.before) {
-      requestQuery.createdAt = { $lte: query.before };
+      if (query.after) {
+        requestQuery.createdAt.$gte = query.after;
+      }
+
+      if (query.before) {
+        requestQuery.createdAt.$lte = query.before;
+      }
     }
 
     if (query?.templates) {
@@ -111,7 +115,7 @@ export class NotificationRepository extends BaseRepository<
           readPreference: 'secondaryPreferred',
         },
         path: 'template',
-        select: '_id name triggers',
+        select: '_id name triggers origin',
       })
       .populate({
         options: {

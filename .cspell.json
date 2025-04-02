@@ -6,9 +6,14 @@
     "ABNF",
     "ORGANISATION",
     "EQAs",
+    "Lookback",
+    "analagous",
     "addrs",
+    "Tiering",
     "subscriberpayloaddto",
+    "pinno",
     "adresses",
+    "APIJSON",
     "sdkerror",
     "idempotancy",
     "errordto",
@@ -497,9 +502,6 @@
     "Pushwoosh",
     "pychecker",
     "pydns",
-    "pyroscope",
-    "Pyroscope",
-    "PYROSCOPE",
     "pyspf",
     "QCLASS",
     "qtype",
@@ -520,7 +522,6 @@
     "readall",
     "rediscommander",
     "redismaster",
-    "redlock",
     "Redmine",
     "reindented",
     "relabelings",
@@ -724,7 +725,12 @@
     "navigatable",
     "facated",
     "dotenvcreate",
-    "querybuilder"
+    "querybuilder",
+    "liquified",
+    "autoload",
+    "novugo",
+    "titleize",
+    "oklch"
   ],
   "flagWords": [],
   "patterns": [
@@ -802,6 +808,7 @@
     "apps/api/src/app/workflows-v2/maily-test-data.ts",
     "apps/api/src/app/workflows-v2/usecases/validate-content/validate-placeholders/validate-placeholder.usecase.ts",
     "apps/dashboard/eslint.config.js",
+    "libs/internal-sdk/**/*",
     "apps/web/env.sh",
     "apps/web/playwright.config.ts",
     "apps/web/src/pages/playground/web-container-configuration/sandbox-vite/*.ts",
@@ -827,7 +834,8 @@
     "tsconfig.json",
     "unreadRead",
     "websockets",
-    "apps/dashboard/src/components/header-navigation/customer-support-button.tsx",
-    "apps/dashboard/src/components/primitives/control-input/variable-popover/constants.ts"
+    "apps/dashboard/src/hooks/use-plain-chat.ts",
+    "apps/dashboard/src/components/variable/constants.ts",
+    "apps/dashboard/src/utils/locales.ts"
   ]
 }

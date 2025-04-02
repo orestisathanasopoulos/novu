@@ -1,5 +1,5 @@
-import { Template, Liquid, RenderError, LiquidError } from 'liquidjs';
-import { isValidTemplate, extractLiquidExpressions } from './parser-utils';
+import { Liquid, LiquidError, RenderError, Template } from 'liquidjs';
+import { extractLiquidExpressions, isValidTemplate } from './parser-utils';
 
 const LIQUID_CONFIG = {
   strictVariables: true,
@@ -7,6 +7,16 @@ const LIQUID_CONFIG = {
   greedy: false,
   catchAllErrors: true,
 } as const;
+
+export const buildLiquidParser = () => {
+  const parserEngine = new Liquid(LIQUID_CONFIG);
+  // Register digest filter for validation of digest transformers
+  parserEngine.registerFilter('digest', () => '');
+
+  return parserEngine;
+};
+
+const parserEngine = buildLiquidParser();
 
 export type Variable = {
   /**
@@ -125,15 +135,23 @@ function processLiquidRawOutput(rawOutputs: string[]): TemplateVariables {
 function parseByLiquid(rawOutput: string): TemplateVariables {
   const validVariables: Variable[] = [];
   const invalidVariables: Variable[] = [];
-  const engine = new Liquid(LIQUID_CONFIG);
-  const parsed = engine.parse(rawOutput) as unknown as Template[];
+  const parsed = parserEngine.parse(rawOutput) as unknown as Template[];
 
   parsed.forEach((template: Template) => {
     if (isOutputToken(template)) {
       const result = extractProps(template);
 
       if (result.valid && result.props.length > 0) {
-        validVariables.push({ name: result.props.join('.'), output: rawOutput });
+        const path = result.props.reduce((acc, prop, i) => {
+          // if the prop is a number, preserve array notation (.[idx])
+          if (typeof prop === 'number') {
+            return `${acc}[${prop}]`;
+          }
+
+          return i === 0 ? prop : `${acc}.${prop}`;
+        }, '');
+
+        validVariables.push({ name: path, output: rawOutput });
       }
 
       if (!result.valid) {
@@ -165,7 +183,7 @@ function extractProps(template: any): { valid: boolean; props: string[]; error?:
     return {
       valid: false,
       props: [],
-      error: 'Invalid variable name containing whitespaces. Variables must follow the dot notation',
+      error: `contains whitespaces`,
     };
   }
 
@@ -187,7 +205,7 @@ function extractProps(template: any): { valid: boolean; props: string[]; error?:
     return {
       valid: false,
       props: [],
-      error: `Invalid variable name missing namespace. Variables must follow the dot notation (e.g. payload.${validProps[0]})`,
+      error: `missing namespace. Did you mean {{payload.${validProps[0] === 'payload' ? 'someKey' : validProps[0]}}}?`,
     };
   }
 

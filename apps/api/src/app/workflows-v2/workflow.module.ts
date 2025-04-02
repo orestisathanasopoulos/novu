@@ -5,6 +5,7 @@ import {
   DeleteWorkflowUseCase,
   GetPreferences,
   GetWorkflowByIdsUseCase,
+  ResourceValidatorService,
   TierRestrictionsValidateUsecase,
   UpdateWorkflow,
   UpsertControlValuesUseCase,
@@ -15,25 +16,25 @@ import { CommunityOrganizationRepository } from '@novu/dal';
 import { AuthModule } from '../auth/auth.module';
 import { BridgeModule } from '../bridge';
 import { ChangeModule } from '../change/change.module';
-import { HydrateEmailSchemaUseCase } from '../environments-v1/usecases/output-renderers';
 import { IntegrationModule } from '../integrations/integrations.module';
 import { MessageTemplateModule } from '../message-template/message-template.module';
 import { SharedModule } from '../shared/shared.module';
 import {
-  BuildVariableSchemaUsecase,
   BuildStepDataUsecase,
+  BuildVariableSchemaUsecase,
   BuildWorkflowTestDataUseCase,
-  GeneratePreviewUsecase,
+  PreviewUsecase,
   GetWorkflowUseCase,
   ListWorkflowsUseCase,
   SyncToEnvironmentUseCase,
   UpsertWorkflowUseCase,
 } from './usecases';
 import { PatchWorkflowUsecase } from './usecases/patch-workflow';
-import { PatchStepUsecase } from './usecases/patch-step-data/patch-step.usecase';
-import { BuildPayloadSchema } from './usecases/build-payload-schema/build-payload-schema.usecase';
+import { PatchStepUsecase } from './usecases/patch-step-data';
+import { CreateVariablesObject } from './usecases/create-variables-object/create-variables-object.usecase';
 import { BuildStepIssuesUsecase } from './usecases/build-step-issues/build-step-issues.usecase';
 import { WorkflowController } from './workflow.controller';
+import { DuplicateWorkflowUseCase } from './usecases/duplicate-workflow/duplicate-workflow.usecase';
 
 const DAL_REPOSITORIES = [CommunityOrganizationRepository];
 
@@ -54,16 +55,17 @@ const DAL_REPOSITORIES = [CommunityOrganizationRepository];
     GetWorkflowByIdsUseCase,
     SyncToEnvironmentUseCase,
     BuildStepDataUsecase,
-    GeneratePreviewUsecase,
+    PreviewUsecase,
     BuildWorkflowTestDataUseCase,
     GetWorkflowUseCase,
-    HydrateEmailSchemaUseCase,
+    DuplicateWorkflowUseCase,
     BuildVariableSchemaUsecase,
     PatchStepUsecase,
     PatchWorkflowUsecase,
-    TierRestrictionsValidateUsecase,
-    BuildPayloadSchema,
+    CreateVariablesObject,
     BuildStepIssuesUsecase,
+    ResourceValidatorService,
+    TierRestrictionsValidateUsecase,
   ],
 })
 export class WorkflowModule implements NestModule {

@@ -1,16 +1,16 @@
-import React from 'react';
-import { useValueEditor, ValueEditorProps } from 'react-querybuilder';
 import { useFormContext } from 'react-hook-form';
+import { useValueEditor, ValueEditorProps } from 'react-querybuilder';
 
-import { InputRoot, InputWrapper } from '@/components/primitives/input';
-import { LiquidVariable } from '@/utils/parseStepVariablesToLiquidVariables';
+import { InputRoot } from '@/components/primitives/input';
+import { IsAllowedVariable, LiquidVariable } from '@/utils/parseStepVariables';
 import { ControlInput } from '../primitives/control-input/control-input';
 
-export const ValueEditor = React.memo((props: ValueEditorProps) => {
+export const ValueEditor = (props: ValueEditorProps) => {
   const form = useFormContext();
   const queryPath = 'query.rules.' + props.path.join('.rules.') + '.value';
   const { error } = form.getFieldState(queryPath, form.formState);
-  const { variables } = props.context as { variables: LiquidVariable[] };
+  const { variables = [], isAllowedVariable } =
+    (props.context as { variables: LiquidVariable[]; isAllowedVariable: IsAllowedVariable }) ?? {};
   const { value, handleOnChange, operator, type } = props;
   const { valueAsArray, multiValueHandler } = useValueEditor(props);
 
@@ -21,17 +21,17 @@ export const ValueEditor = React.memo((props: ValueEditorProps) => {
   if ((operator === 'between' || operator === 'notBetween') && (type === 'select' || type === 'text')) {
     const editors = ['from', 'to'].map((key, i) => {
       return (
-        <InputRoot key={key} size="2xs" className="w-28" hasError={!!error && !valueAsArray[i]}>
-          <InputWrapper className="h-7">
-            <ControlInput
-              multiline={false}
-              indentWithTab={false}
-              placeholder="value"
-              value={valueAsArray[i] ?? ''}
-              onChange={(newValue) => multiValueHandler(newValue, i)}
-              variables={variables}
-            />
-          </InputWrapper>
+        <InputRoot key={key} className="bg-bg-white w-28" hasError={!!error && !valueAsArray[i]}>
+          <ControlInput
+            multiline={false}
+            indentWithTab={false}
+            placeholder="value"
+            value={valueAsArray[i] ?? ''}
+            onChange={(newValue) => multiValueHandler(newValue, i)}
+            variables={variables}
+            isAllowedVariable={isAllowedVariable}
+            size="2xs"
+          />
         </InputRoot>
       );
     });
@@ -50,19 +50,19 @@ export const ValueEditor = React.memo((props: ValueEditorProps) => {
 
   return (
     <div className="flex flex-col gap-1">
-      <InputRoot size="2xs" className="w-40" hasError={!!error}>
-        <InputWrapper className="h-7">
-          <ControlInput
-            multiline={false}
-            indentWithTab={false}
-            placeholder="value"
-            value={value ?? ''}
-            onChange={handleOnChange}
-            variables={variables}
-          />
-        </InputWrapper>
+      <InputRoot className="bg-bg-white w-40" hasError={!!error}>
+        <ControlInput
+          multiline={false}
+          indentWithTab={false}
+          placeholder="value"
+          value={value ?? ''}
+          onChange={handleOnChange}
+          variables={variables}
+          isAllowedVariable={isAllowedVariable}
+          size="2xs"
+        />
       </InputRoot>
       {error && <span className="text-destructive text-xs">{error?.message}</span>}
     </div>
   );
-});
+};

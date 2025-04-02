@@ -1,19 +1,18 @@
-import { useMemo } from 'react';
 import { useFormContext } from 'react-hook-form';
 
 import { ControlInput } from '@/components/primitives/control-input';
 import { FormControl, FormField, FormItem, FormMessage } from '@/components/primitives/form/form';
+import { InputRoot } from '@/components/primitives/input';
 import { useWorkflow } from '@/components/workflow-editor/workflow-provider';
-import { parseStepVariablesToLiquidVariables } from '@/utils/parseStepVariablesToLiquidVariables';
-import { capitalize } from '@/utils/string';
-import { InputRoot, InputWrapper } from '../../../primitives/input';
+import { useParseVariables } from '@/hooks/use-parse-variables';
+import { capitalize, containsHTMLEntities } from '@/utils/string';
 
 const subjectKey = 'subject';
 
 export const InAppSubject = () => {
-  const { control } = useFormContext();
+  const { control, getValues } = useFormContext();
   const { step } = useWorkflow();
-  const variables = useMemo(() => (step ? parseStepVariablesToLiquidVariables(step.variables) : []), [step]);
+  const { variables, isAllowedVariable } = useParseVariables(step?.variables);
 
   return (
     <FormField
@@ -23,20 +22,23 @@ export const InAppSubject = () => {
         <FormItem className="w-full">
           <FormControl>
             <InputRoot hasError={!!fieldState.error}>
-              <InputWrapper className="flex h-9 items-center p-2.5">
-                <ControlInput
-                  multiline={false}
-                  indentWithTab={false}
-                  placeholder={capitalize(field.name)}
-                  id={field.name}
-                  value={field.value}
-                  onChange={field.onChange}
-                  variables={variables}
-                />
-              </InputWrapper>
+              <ControlInput
+                multiline={false}
+                indentWithTab={false}
+                placeholder={capitalize(field.name)}
+                id={field.name}
+                value={field.value}
+                onChange={field.onChange}
+                variables={variables}
+                isAllowedVariable={isAllowedVariable}
+              />
             </InputRoot>
           </FormControl>
-          <FormMessage />
+          <FormMessage>
+            {containsHTMLEntities(field.value) &&
+              !getValues('disableOutputSanitization') &&
+              'HTML entities detected. Consider disabling content sanitization for proper rendering'}
+          </FormMessage>
         </FormItem>
       )}
     />

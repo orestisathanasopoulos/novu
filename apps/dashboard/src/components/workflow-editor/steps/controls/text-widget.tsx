@@ -1,8 +1,8 @@
 import { ControlInput } from '@/components/primitives/control-input';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/primitives/form/form';
-import { Input } from '@/components/primitives/input';
+import { Input, InputRoot, InputWrapper } from '@/components/primitives/input';
 import { useWorkflow } from '@/components/workflow-editor/workflow-provider';
-import { parseStepVariablesToLiquidVariables } from '@/utils/parseStepVariablesToLiquidVariables';
+import { useParseVariables } from '@/hooks/use-parse-variables';
 import { capitalize } from '@/utils/string';
 import { type WidgetProps } from '@rjsf/utils';
 import { useMemo } from 'react';
@@ -13,7 +13,7 @@ export function TextWidget(props: WidgetProps) {
   const { label, readonly, disabled, id, required } = props;
   const { control } = useFormContext();
   const { step } = useWorkflow();
-  const variables = useMemo(() => (step ? parseStepVariablesToLiquidVariables(step.variables) : []), [step]);
+  const { variables, isAllowedVariable } = useParseVariables(step?.variables);
 
   const extractedName = useMemo(() => getFieldName(id), [id]);
   const isNumberType = useMemo(() => props.schema.type === 'number', [props.schema.type]);
@@ -33,12 +33,13 @@ export function TextWidget(props: WidgetProps) {
                 hasError={!!fieldState.error}
                 onChange={(e) => {
                   if (e.target.value === '') {
-                    field.onChange(undefined);
+                    field.onChange('');
                     return;
                   }
+
                   const val = Number(e.target.value);
                   const isNaN = Number.isNaN(val);
-                  const finalValue = isNaN ? undefined : val;
+                  const finalValue = isNaN ? '' : val;
                   field.onChange(finalValue);
                 }}
                 required={required}
@@ -47,15 +48,20 @@ export function TextWidget(props: WidgetProps) {
                 placeholder={capitalize(label)}
               />
             ) : (
-              <ControlInput
-                indentWithTab={false}
-                placeholder={capitalize(label)}
-                id={label}
-                value={field.value}
-                onChange={field.onChange}
-                variables={variables}
-                size="default"
-              />
+              <InputRoot hasError={!!fieldState.error}>
+                <InputWrapper className="flex h-full items-center p-2 py-1">
+                  <ControlInput
+                    indentWithTab={false}
+                    placeholder={capitalize(label)}
+                    id={label}
+                    value={field.value}
+                    onChange={field.onChange}
+                    variables={variables}
+                    isAllowedVariable={isAllowedVariable}
+                    size="sm"
+                  />
+                </InputWrapper>
+              </InputRoot>
             )}
           </FormControl>
           <FormMessage />

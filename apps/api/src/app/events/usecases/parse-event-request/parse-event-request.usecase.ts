@@ -1,58 +1,51 @@
-import { Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
-import { addBreadcrumb } from '@sentry/node';
-import { randomBytes } from 'crypto';
-import { merge } from 'lodash';
-import { v4 as uuidv4 } from 'uuid';
+import { BadRequestException, Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
-
 import {
-  AnalyticsService,
-  buildHasNotificationKey,
-  buildNotificationTemplateIdentifierKey,
-  CachedEntity,
   ExecuteBridgeRequest,
   ExecuteBridgeRequestCommand,
   ExecuteBridgeRequestDto,
-  GetFeatureFlag,
-  GetFeatureFlagCommand,
+  FeatureFlagsService,
   Instrument,
   InstrumentUsecase,
-  InvalidateCacheService,
   IWorkflowDataDto,
+  PinoLogger,
   StorageHelperService,
   WorkflowQueueService,
 } from '@novu/application-generic';
 import {
-  FeatureFlagsKeysEnum,
-  INVITE_TEAM_MEMBER_NUDGE_PAYLOAD_KEY,
-  ReservedVariablesMap,
-  TriggerContextTypeEnum,
-  TriggerEventStatusEnum,
-  WorkflowOriginEnum,
-} from '@novu/shared';
-import {
+  CommunityOrganizationRepository,
   EnvironmentEntity,
   EnvironmentRepository,
-  MemberRepository,
-  NotificationRepository,
   NotificationTemplateEntity,
   NotificationTemplateRepository,
+  OrganizationEntity,
   TenantEntity,
   TenantRepository,
-  UserRepository,
+  UserEntity,
   WorkflowOverrideEntity,
   WorkflowOverrideRepository,
 } from '@novu/dal';
 import { DiscoverWorkflowOutput, GetActionEnum } from '@novu/framework/internal';
-
-import { Novu } from '@novu/api';
+import {
+  FeatureFlagsKeysEnum,
+  ReservedVariablesMap,
+  TriggerContextTypeEnum,
+  TriggerEventStatusEnum,
+  TriggerRecipientsPayload,
+  WorkflowOriginEnum,
+} from '@novu/shared';
+import { addBreadcrumb } from '@sentry/node';
+import { randomBytes } from 'crypto';
+import { merge } from 'lodash';
+import { v4 as uuidv4 } from 'uuid';
+import { ApiException } from '../../../shared/exceptions/api.exception';
+import { RecipientSchema, RecipientsSchema } from '../../utils/trigger-recipient-validation';
+import { VerifyPayload, VerifyPayloadCommand } from '../verify-payload';
 import {
   ParseEventRequestBroadcastCommand,
   ParseEventRequestCommand,
   ParseEventRequestMulticastCommand,
 } from './parse-event-request.command';
-import { ApiException } from '../../../shared/exceptions/api.exception';
-import { VerifyPayload, VerifyPayloadCommand } from '../verify-payload';
 
 const LOG_CONTEXT = 'ParseEventRequest';
 
@@ -60,19 +53,16 @@ const LOG_CONTEXT = 'ParseEventRequest';
 export class ParseEventRequest {
   constructor(
     private notificationTemplateRepository: NotificationTemplateRepository,
-    private notificationRepository: NotificationRepository,
     private environmentRepository: EnvironmentRepository,
-    private userRepository: UserRepository,
-    private memberRepository: MemberRepository,
+    private communityOrganizationRepository: CommunityOrganizationRepository,
     private verifyPayload: VerifyPayload,
     private storageHelperService: StorageHelperService,
     private workflowQueueService: WorkflowQueueService,
     private tenantRepository: TenantRepository,
     private workflowOverrideRepository: WorkflowOverrideRepository,
-    private analyticsService: AnalyticsService,
-    private getFeatureFlag: GetFeatureFlag,
-    private invalidateCacheService: InvalidateCacheService,
     private executeBridgeRequest: ExecuteBridgeRequest,
+    private logger: PinoLogger,
+    private featureFlagService: FeatureFlagsService,
     protected moduleRef: ModuleRef
   ) {}
 
@@ -80,19 +70,35 @@ export class ParseEventRequest {
   public async execute(command: ParseEventRequestCommand) {
     const transactionId = command.transactionId || uuidv4();
 
-    const { environment, statelessWorkflowAllowed } = await this.isStatelessWorkflowAllowed(
-      command.environmentId,
-      command.bridgeUrl
-    );
+    const [environment, organization] = await Promise.all([
+      this.environmentRepository.findOne({ _id: command.environmentId }),
+      this.communityOrganizationRepository.findOne({ _id: command.organizationId }),
+    ]);
 
-    if (environment && statelessWorkflowAllowed) {
+    if (!organization) {
+      throw new BadRequestException('Organization not found');
+    }
+
+    if (!environment) {
+      throw new BadRequestException('Environment not found');
+    }
+
+    const statelessWorkflowAllowed = this.isStatelessWorkflowAllowed(command.bridgeUrl);
+
+    if (statelessWorkflowAllowed) {
       const discoveredWorkflow = await this.queryDiscoverWorkflow(command);
 
       if (!discoveredWorkflow) {
         throw new UnprocessableEntityException('workflow_not_found');
       }
 
-      return await this.dispatchEvent(command, transactionId, discoveredWorkflow);
+      return await this.dispatchEventToWorkflowQueue({
+        command,
+        transactionId,
+        discoveredWorkflow,
+        environment,
+        organization,
+      });
     }
 
     const template = await this.getNotificationTemplateByTriggerIdentifier({
@@ -138,6 +144,7 @@ export class ParseEventRequest {
     if (inactiveWorkflowOverride || inactiveWorkflow) {
       const message = workflowOverride ? 'Workflow is not active by workflow override' : 'Workflow is not active';
       Logger.log(message, LOG_CONTEXT);
+      this.logger.info(command, `${LOG_CONTEXT}:${message}`);
 
       return {
         acknowledged: true,
@@ -183,7 +190,9 @@ export class ParseEventRequest {
     // eslint-disable-next-line no-param-reassign
     command.payload = merge({}, defaultPayload, command.payload);
 
-    return await this.dispatchEvent(command, transactionId);
+    const result = await this.dispatchEventToWorkflowQueue({ command, transactionId, environment, organization });
+
+    return result;
   }
 
   private async queryDiscoverWorkflow(command: ParseEventRequestCommand): Promise<DiscoverWorkflowOutput | null> {
@@ -203,19 +212,70 @@ export class ParseEventRequest {
     return discover?.workflows?.find((findWorkflow) => findWorkflow.workflowId === command.identifier) || null;
   }
 
-  private async dispatchEvent(
-    command: ParseEventRequestMulticastCommand | ParseEventRequestBroadcastCommand,
+  private async dispatchEventToWorkflowQueue({
+    command,
     transactionId,
-    discoveredWorkflow?: DiscoverWorkflowOutput | null
-  ) {
-    const jobData: IWorkflowDataDto = {
+    discoveredWorkflow,
+    environment,
+    organization,
+  }: {
+    command: ParseEventRequestMulticastCommand | ParseEventRequestBroadcastCommand;
+    transactionId: string;
+    discoveredWorkflow?: DiscoverWorkflowOutput | null;
+    environment?: EnvironmentEntity;
+    organization?: OrganizationEntity;
+  }) {
+    const commandArgs = {
       ...command,
+    };
+
+    const isDryRun = await this.featureFlagService.getFlag({
+      environment,
+      organization,
+      user: { _id: command.userId } as UserEntity,
+      key: FeatureFlagsKeysEnum.IS_SUBSCRIBER_ID_VALIDATION_DRY_RUN_ENABLED,
+      defaultValue: true,
+    });
+
+    if ('to' in commandArgs) {
+      const { validRecipients, invalidRecipients } = this.parseRecipients(commandArgs.to);
+
+      if (invalidRecipients.length > 0 && isDryRun) {
+        Logger.warn(
+          `[Dry run] Invalid recipients: ${invalidRecipients.map((recipient) => JSON.stringify(recipient)).join(', ')}`,
+          'ParseEventRequest'
+        );
+      }
+
+      /**
+       * If all the recipients are invalid, we should return with status INVALID_RECIPIENTS,
+       * otherwise we should continue with the valid recipients.
+       */
+      if (!validRecipients && !isDryRun) {
+        return {
+          acknowledged: true,
+          status: TriggerEventStatusEnum.INVALID_RECIPIENTS,
+          transactionId,
+        };
+      }
+
+      if (!isDryRun && validRecipients) {
+        commandArgs.to = validRecipients as TriggerRecipientsPayload;
+      }
+    }
+
+    const jobData: IWorkflowDataDto = {
+      ...commandArgs,
       actor: command.actor,
       transactionId,
       bridgeWorkflow: discoveredWorkflow ?? undefined,
     };
 
     await this.workflowQueueService.add({ name: transactionId, data: jobData, groupId: command.organizationId });
+    this.logger.info(
+      { ...command, transactionId, discoveredWorkflowId: discoveredWorkflow?.workflowId },
+      'TriggerEventUseCase - Event dispatched to [Workflow] Queue'
+    );
 
     return {
       acknowledged: true,
@@ -224,31 +284,15 @@ export class ParseEventRequest {
     };
   }
 
-  private async isStatelessWorkflowAllowed(
-    environmentId: string,
-    bridgeUrl: string | undefined
-  ): Promise<{ environment: EnvironmentEntity | null; statelessWorkflowAllowed: boolean }> {
+  private isStatelessWorkflowAllowed(bridgeUrl: string | undefined) {
     if (!bridgeUrl) {
-      return { environment: null, statelessWorkflowAllowed: false };
+      return false;
     }
 
-    const environment = await this.environmentRepository.findOne({ _id: environmentId });
-
-    if (!environment) {
-      throw new UnprocessableEntityException('Environment not found');
-    }
-
-    return { environment, statelessWorkflowAllowed: true };
+    return true;
   }
 
   @Instrument()
-  @CachedEntity({
-    builder: (command: { triggerIdentifier: string; environmentId: string }) =>
-      buildNotificationTemplateIdentifierKey({
-        _environmentId: command.environmentId,
-        templateIdentifier: command.triggerIdentifier,
-      }),
-  })
   private async getNotificationTemplateByTriggerIdentifier(command: {
     triggerIdentifier: string;
     environmentId: string;
@@ -305,5 +349,59 @@ export class ParseEventRequest {
     const { reservedVariables } = template.triggers[0];
 
     return reservedVariables?.map((reservedVariable) => reservedVariable.type) || [];
+  }
+
+  /**
+   * Validates a single Parent item.
+   * @param item - The item to validate
+   * @param invalidValues - Array to collect invalid values
+   * @returns The valid item or null if invalid
+   */
+  private validateItem(item: unknown, invalidValues: unknown[]) {
+    const result = RecipientSchema.safeParse(item);
+    if (result.success) {
+      return result.data;
+    } else {
+      invalidValues.push(item);
+
+      return null;
+    }
+  }
+
+  /**
+   * Parses and validates the recipients from the given input.
+   *
+   * The input can be a single recipient or an array of recipients. Each recipient can be:
+   * - A string that matches the `SUBSCRIBER_ID_REGEX`
+   * - An object with a `subscriberId` property that matches the `SUBSCRIBER_ID_REGEX`
+   * - An object with a `topicKey` property that matches the `SUBSCRIBER_ID_REGEX`
+   *
+   * If the input is valid, it returns the parsed data. If the input is an array, it returns an object
+   * containing arrays of valid and invalid values. If the input is a single item, it returns an object
+   * containing the valid item and an array of invalid values.
+   *
+   * @param input - The input to parse and validate. Can be a single recipient or an array of recipients.
+   * @returns The object containing valid and invalid values.
+   */
+  private parseRecipients(input: unknown) {
+    const invalidValues: unknown[] = [];
+
+    // Try to validate the whole input first
+    const parsed = RecipientsSchema.safeParse(input);
+    if (parsed.success) {
+      return { validRecipients: parsed.data, invalidRecipients: [] };
+    }
+
+    // If input is an array, validate each item
+    if (Array.isArray(input)) {
+      const validValues = input.map((item) => this.validateItem(item, invalidValues)).filter(Boolean);
+
+      return { validRecipients: validValues, invalidRecipients: invalidValues };
+    }
+
+    // If input is a single item
+    const validItem = this.validateItem(input, invalidValues);
+
+    return { validRecipients: validItem, invalidRecipients: invalidValues };
   }
 }

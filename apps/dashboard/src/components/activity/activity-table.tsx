@@ -2,9 +2,10 @@ import { ActivityFilters } from '@/api/activity';
 import { Skeleton } from '@/components/primitives/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/primitives/table';
 import { TimeDisplayHoverCard } from '@/components/time-display-hover-card';
+import { formatDate } from '@/utils/format-date';
+import { parsePageParam } from '@/utils/parse-page-param';
 import { cn } from '@/utils/ui';
 import { ISubscriber } from '@novu/shared';
-import { format } from 'date-fns';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect } from 'react';
 import { createSearchParams, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
@@ -71,7 +72,7 @@ export function ActivityTable({
           transition={{ duration: 0.2 }}
           className="flex h-full w-full items-center justify-center"
         >
-          <ActivityEmptyState emptySearchResults={hasActiveFilters} onClearFilters={onClearFilters} />
+          <ActivityEmptyState filters={filters} emptySearchResults={hasActiveFilters} onClearFilters={onClearFilters} />
         </motion.div>
       ) : (
         <motion.div
@@ -80,7 +81,7 @@ export function ActivityTable({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="flex min-h-full min-w-[800px] flex-1 flex-col"
+          className="flex min-h-full flex-1 flex-col"
         >
           <Table
             isLoading={isLoading}
@@ -90,9 +91,10 @@ export function ActivityTable({
             <TableHeader className="shadow-none">
               <TableRow className="border-b border-neutral-200 shadow-none [&>th]:border-b [&>th]:border-neutral-200">
                 <TableHead className="h-9 px-3 py-0">Event</TableHead>
+                <TableHead className="h-9 px-3 py-0">Subscriber</TableHead>
                 <TableHead className="h-9 px-3 py-0">Status</TableHead>
                 <TableHead className="h-9 px-3 py-0">Steps</TableHead>
-                <TableHead className="h-9 px-3 py-0">Triggered Date</TableHead>
+                <TableHead className="h-9 px-3 py-0">Triggered at</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -111,8 +113,20 @@ export function ActivityTable({
                       <span className="text-foreground-950 font-medium">
                         {activity.template?.name || 'Deleted workflow'}
                       </span>
-                      <span className="text-foreground-400 text-[10px] leading-[14px]">
-                        {activity.transactionId}{' '}
+                      <span className="text-foreground-400 text-[10px] leading-[14px]" title={'Transaction ID'}>
+                        {activity.transactionId || '-'}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-foreground-600 px-3">
+                    <div className="flex flex-col">
+                      <span
+                        className="inline-block max-w-[200px] truncate"
+                        title={'Subscriber ID: ' + activity.subscriber?.subscriberId || ''}
+                      >
+                        {activity.subscriber?.subscriberId || '-'}
+                      </span>
+                      <span className="text-foreground-400 text-[10px] leading-[14px]" title={'Subscriber Name'}>
                         {getSubscriberDisplay(
                           activity.subscriber as Pick<ISubscriber, '_id' | 'subscriberId' | 'firstName' | 'lastName'>
                         )}
@@ -140,10 +154,6 @@ export function ActivityTable({
       )}
     </AnimatePresence>
   );
-}
-
-function formatDate(date: string) {
-  return format(new Date(date), 'MMM d yyyy, HH:mm:ss');
 }
 
 function SkeletonRow() {
@@ -181,15 +191,8 @@ function getSubscriberDisplay(subscriber?: Pick<ISubscriber, '_id' | 'subscriber
   if (!subscriber) return '';
 
   if (subscriber.firstName || subscriber.lastName) {
-    return `• ${subscriber.firstName || ''} ${subscriber.lastName || ''}`;
+    return `${subscriber.firstName || ''} ${subscriber.lastName || ''}`.trim();
   }
 
   return '';
-}
-function parsePageParam(param: string | null): number {
-  if (!param) return 0;
-
-  const parsed = Number.parseInt(param, 10);
-
-  return Math.max(0, parsed || 0);
 }

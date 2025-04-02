@@ -1,18 +1,16 @@
-import { type Field, QueryBuilder, RuleGroupType } from 'react-querybuilder';
+import { useMemo } from 'react';
+import { type Field, QueryBuilder, RuleGroupType, Translations } from 'react-querybuilder';
 import 'react-querybuilder/dist/query-builder.css';
 
-import { LiquidVariable } from '@/utils/parseStepVariablesToLiquidVariables';
-import {
-  ConditionsEditorProvider,
-  useConditionsEditorContext,
-} from '@/components/conditions-editor/conditions-editor-context';
 import { AddConditionAction } from '@/components/conditions-editor/add-condition-action';
 import { AddGroupAction } from '@/components/conditions-editor/add-group-action';
-import { OperatorSelector } from '@/components/conditions-editor/operator-selector';
 import { CombinatorSelector } from '@/components/conditions-editor/combinator-selector';
-import { ValueEditor } from '@/components/conditions-editor/value-editor';
+import { ConditionsEditorProvider } from '@/components/conditions-editor/conditions-editor-context';
 import { FieldSelector } from '@/components/conditions-editor/field-selector';
+import { OperatorSelector } from '@/components/conditions-editor/operator-selector';
 import { RuleActions } from '@/components/conditions-editor/rule-actions';
+import { ValueEditor } from '@/components/conditions-editor/value-editor';
+import { IsAllowedVariable, LiquidVariable } from '@/utils/parseStepVariables';
 
 const ruleActionsClassName = `[&>[data-actions="true"]]:opacity-0 [&:hover>[data-actions="true"]]:opacity-100 [&>[data-actions="true"]:has(~[data-radix-popper-content-wrapper])]:opacity-100`;
 const groupActionsClassName = `[&_.ruleGroup-header>[data-actions="true"]]:opacity-0 [&_.ruleGroup-header:hover>[data-actions="true"]]:opacity-100 [&_.ruleGroup-header>[data-actions="true"]:has(~[data-radix-popper-content-wrapper])]:opacity-100`;
@@ -20,43 +18,63 @@ const nestedGroupClassName = `[&.ruleGroup_.ruleGroup]:p-3 [&.ruleGroup_.ruleGro
 const ruleGroupClassName = `[&.ruleGroup]:[background:transparent] [&.ruleGroup]:[border:none] [&.ruleGroup]:p-0 ${nestedGroupClassName} [&_.ruleGroup-body_.rule]:items-start ${groupActionsClassName}`;
 const ruleClassName = `${ruleActionsClassName}`;
 
-function InternalConditionsEditor({ fields, variables }: { fields: Field[]; variables: LiquidVariable[] }) {
-  const { query, setQuery } = useConditionsEditorContext();
+const controlClassnames = {
+  ruleGroup: ruleGroupClassName,
+  rule: ruleClassName,
+  queryBuilder:
+    'queryBuilder-branches [&_.rule]:before:border-stroke-soft [&_.rule]:after:border-stroke-soft [&_.ruleGroup_.ruleGroup]:before:border-stroke-soft [&_.ruleGroup_.ruleGroup]:after:border-stroke-soft',
+};
+
+const translations: Partial<Translations> = {
+  addRule: {
+    label: 'Add condition',
+    title: 'Add condition',
+  },
+  addGroup: {
+    label: 'Add group',
+    title: 'Add group',
+  },
+};
+
+const controlElements = {
+  operatorSelector: OperatorSelector,
+  combinatorSelector: CombinatorSelector,
+  fieldSelector: FieldSelector,
+  valueEditor: ValueEditor,
+  addRuleAction: AddConditionAction,
+  addGroupAction: AddGroupAction,
+  removeGroupAction: RuleActions,
+  removeRuleAction: RuleActions,
+  cloneGroupAction: null,
+  cloneRuleAction: null,
+};
+
+function InternalConditionsEditor({
+  fields,
+  variables,
+  isAllowedVariable,
+  query,
+  onQueryChange,
+}: {
+  fields: Field[];
+  variables: LiquidVariable[];
+  isAllowedVariable: IsAllowedVariable;
+  query: RuleGroupType;
+  onQueryChange: (query: RuleGroupType) => void;
+}) {
+  const context = useMemo(() => ({ variables, isAllowedVariable }), [variables, isAllowedVariable]);
 
   return (
     <QueryBuilder
       fields={fields}
-      context={{
-        variables,
-      }}
-      controlElements={{
-        operatorSelector: OperatorSelector,
-        combinatorSelector: CombinatorSelector,
-        fieldSelector: FieldSelector,
-        valueEditor: ValueEditor,
-        addRuleAction: AddConditionAction,
-        addGroupAction: AddGroupAction,
-        removeGroupAction: RuleActions,
-        removeRuleAction: RuleActions,
-        cloneGroupAction: null,
-        cloneRuleAction: null,
-      }}
+      context={context}
+      controlElements={controlElements}
       query={query}
-      onQueryChange={setQuery}
-      controlClassnames={{
-        ruleGroup: ruleGroupClassName,
-        rule: ruleClassName,
-      }}
-      translations={{
-        addRule: {
-          label: 'Add condition',
-          title: 'Add condition',
-        },
-        addGroup: {
-          label: 'Add group',
-          title: 'Add group',
-        },
-      }}
+      onQueryChange={onQueryChange}
+      controlClassnames={controlClassnames}
+      translations={translations}
+      accessibleDescriptionGenerator={() => ''}
+      resetOnFieldChange={false}
     />
   );
 }
@@ -66,15 +84,23 @@ export function ConditionsEditor({
   onQueryChange,
   fields,
   variables,
+  isAllowedVariable,
 }: {
   query: RuleGroupType;
   onQueryChange: (query: RuleGroupType) => void;
   fields: Field[];
   variables: LiquidVariable[];
+  isAllowedVariable: IsAllowedVariable;
 }) {
   return (
     <ConditionsEditorProvider query={query} onQueryChange={onQueryChange}>
-      <InternalConditionsEditor fields={fields} variables={variables} />
+      <InternalConditionsEditor
+        fields={fields}
+        variables={variables}
+        isAllowedVariable={isAllowedVariable}
+        query={query}
+        onQueryChange={onQueryChange}
+      />
     </ConditionsEditorProvider>
   );
 }

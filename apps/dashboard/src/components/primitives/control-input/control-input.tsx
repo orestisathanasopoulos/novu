@@ -1,16 +1,29 @@
+import { cn } from '@/utils/ui';
 import { autocompletion } from '@codemirror/autocomplete';
 import { EditorView } from '@uiw/react-codemirror';
+import { cva } from 'class-variance-authority';
+import { useCallback, useMemo, useRef } from 'react';
 
 import { Editor } from '@/components/primitives/editor';
-import { Popover, PopoverTrigger } from '@/components/primitives/popover';
+import { EditVariablePopover } from '@/components/variable/edit-variable-popover';
 import { createAutocompleteSource } from '@/utils/liquid-autocomplete';
-import { LiquidVariable } from '@/utils/parseStepVariablesToLiquidVariables';
-import { useCallback, useMemo, useRef } from 'react';
+import { IsAllowedVariable, LiquidVariable } from '@/utils/parseStepVariables';
 import { useVariables } from './hooks/use-variables';
 import { createVariableExtension } from './variable-plugin';
 import { variablePillTheme } from './variable-plugin/variable-theme';
-import { VariablePopover } from './variable-popover';
-import { cn } from '@/utils/ui';
+
+const variants = cva('relative w-full', {
+  variants: {
+    size: {
+      md: 'p-2.5',
+      sm: 'p-2.5',
+      '2xs': 'px-2 py-1.5',
+    },
+  },
+  defaultVariants: {
+    size: 'sm',
+  },
+});
 
 type CompletionRange = {
   from: number;
@@ -18,12 +31,14 @@ type CompletionRange = {
 };
 
 type ControlInputProps = {
+  className?: string;
   value: string;
   onChange: (value: string) => void;
   variables: LiquidVariable[];
+  isAllowedVariable: IsAllowedVariable;
   placeholder?: string;
   autoFocus?: boolean;
-  size?: 'default' | 'lg';
+  size?: 'md' | 'sm' | '2xs';
   id?: string;
   multiline?: boolean;
   indentWithTab?: boolean;
@@ -33,12 +48,14 @@ export function ControlInput({
   value,
   onChange,
   variables,
+  className,
   placeholder,
   autoFocus,
-  size = 'default',
   id,
   multiline = false,
+  size = 'sm',
   indentWithTab,
+  isAllowedVariable,
 }: ControlInputProps) {
   const viewRef = useRef<EditorView | null>(null);
   const lastCompletionRef = useRef<CompletionRange | null>(null);
@@ -67,6 +84,7 @@ export function ControlInput({
         viewRef,
         lastCompletionRef,
         onSelect: handleVariableSelect,
+        isAllowedVariable,
       }),
     [handleVariableSelect]
   );
@@ -86,13 +104,13 @@ export function ControlInput({
   );
 
   return (
-    <div className="relative">
+    <div className={cn(variants({ size }), className)}>
       <Editor
         fontFamily="inherit"
         multiline={multiline}
         indentWithTab={indentWithTab}
         size={size}
-        className={cn('flex-1', { 'overflow-hidden': !multiline })}
+        className={cn('flex-1')}
         autoFocus={autoFocus}
         placeholder={placeholder}
         id={id}
@@ -100,21 +118,19 @@ export function ControlInput({
         value={value}
         onChange={onChange}
       />
-      <Popover open={!!selectedVariable} onOpenChange={handleOpenChange}>
-        <PopoverTrigger asChild>
-          <div />
-        </PopoverTrigger>
-        {selectedVariable && (
-          <VariablePopover
-            variable={selectedVariable.value}
-            onUpdate={(newValue) => {
-              handleVariableUpdate(newValue);
-              // Focus back to the editor after updating the variable
-              viewRef.current?.focus();
-            }}
-          />
-        )}
-      </Popover>
+      <EditVariablePopover
+        open={!!selectedVariable}
+        onOpenChange={handleOpenChange}
+        variable={selectedVariable?.value}
+        isAllowedVariable={isAllowedVariable}
+        onUpdate={(newValue) => {
+          handleVariableUpdate(newValue);
+          // Focus back to the editor after updating the variable
+          viewRef.current?.focus();
+        }}
+      >
+        <div />
+      </EditVariablePopover>
     </div>
   );
 }

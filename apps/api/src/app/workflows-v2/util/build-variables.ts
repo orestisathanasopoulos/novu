@@ -1,10 +1,11 @@
 import _ from 'lodash';
-
-import { MAILY_ITERABLE_MARK, PinoLogger } from '@novu/application-generic';
+import { AdditionalOperation, RulesLogic } from 'json-logic-js';
+import { PinoLogger } from '@novu/application-generic';
 
 import { Variable, extractLiquidTemplateVariables, TemplateVariables } from './template-parser/liquid-parser';
-import { isStringTipTapNode } from './tip-tap.util';
-import { HydrateEmailSchemaUseCase } from '../../environments-v1/usecases/output-renderers/hydrate-email-schema.usecase';
+import { WrapMailyInLiquidUseCase } from '../../environments-v1/usecases/output-renderers/maily-to-liquid/wrap-maily-in-liquid.usecase';
+import { isStringifiedMailyJSONContent } from '../../environments-v1/usecases/output-renderers/maily-to-liquid/wrap-maily-in-liquid.command';
+import { extractFieldsFromRules, isValidRule } from '../../shared/services/query-parser/query-parser.service';
 
 export function buildVariables(
   variableSchema: Record<string, unknown> | undefined,
@@ -13,9 +14,11 @@ export function buildVariables(
 ): TemplateVariables {
   let variableControlValue = controlValue;
 
-  if (isStringTipTapNode(variableControlValue)) {
+  if (isStringifiedMailyJSONContent(variableControlValue)) {
     try {
-      variableControlValue = new HydrateEmailSchemaUseCase().execute({ emailEditor: variableControlValue });
+      variableControlValue = new WrapMailyInLiquidUseCase().execute({
+        emailEditor: variableControlValue,
+      });
     } catch (error) {
       logger?.error(
         {
@@ -26,9 +29,23 @@ export function buildVariables(
         'BuildVariables'
       );
     }
+  } else if (isValidRule(variableControlValue as RulesLogic<AdditionalOperation>)) {
+    const fields = extractFieldsFromRules(variableControlValue as RulesLogic<AdditionalOperation>)
+      .filter((field) => field.startsWith('payload.') || field.startsWith('subscriber.data.'))
+      .map((field) => `{{${field}}}`);
+
+    variableControlValue = {
+      rules: variableControlValue,
+      fields,
+    };
   }
 
   const { validVariables, invalidVariables } = extractLiquidTemplateVariables(JSON.stringify(variableControlValue));
+
+  // don't compare against schema if it's not provided
+  if (!variableSchema) {
+    return { validVariables, invalidVariables };
+  }
 
   const { validVariables: validSchemaVariables, invalidVariables: invalidSchemaVariables } = identifyUnknownVariables(
     variableSchema || {},
@@ -47,7 +64,15 @@ function isPropertyAllowed(schema: Record<string, unknown>, propertyPath: string
     return false;
   }
 
-  const pathParts = propertyPath.split('.');
+  const pathParts = propertyPath
+    .split('.')
+    .map((part) => {
+      // Split array notation into [propName, index]
+      const arrayMatch = part.match(/^(.+?)\[(\d+)\]$/);
+
+      return arrayMatch ? [arrayMatch[1], arrayMatch[2]] : [part];
+    })
+    .flat();
 
   for (const part of pathParts) {
     const { properties, additionalProperties } = currentSchema;
@@ -57,7 +82,9 @@ function isPropertyAllowed(schema: Record<string, unknown>, propertyPath: string
       continue;
     }
 
-    if (part === MAILY_ITERABLE_MARK && currentSchema.type === 'array') {
+    const isArrayIndex = !Number.isNaN(Number(part)) && Number(part) >= 0;
+
+    if (isArrayIndex && currentSchema.type === 'array') {
       currentSchema = currentSchema.items as Record<string, unknown>;
       continue;
     }
